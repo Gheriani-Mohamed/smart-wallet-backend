@@ -4,17 +4,20 @@ const prisma = new PrismaClient();
 // Create a new budget
 exports.createBudget = async (req, res) => {
   try {
-    const { userId, walletId, category, monthlyLimit, month } = req.body;
+    const { userId, walletId, categoryId, monthlyLimit, month } = req.body;
 
     const budget = await prisma.budget.create({
       data: {
         userId,
         walletId,
-        category,
+        categoryId,
         monthlyLimit,
         month,
         currentSpent: 0,
         isActive: true,
+      },
+      include: {
+        category: true, // Include category details in response
       },
     });
 

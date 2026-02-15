@@ -31,11 +31,14 @@ app.get('/health', (req, res) => {
 const setupRoutes = require('./routes/setup');
 const budgetRoutes = require('./routes/budgets');
 const alertRoutes = require('./routes/alerts');
+const categoryRoutes = require('./routes/categories');
+
 
 // Use routes
 app.use('/api/setup', setupRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/alerts', alertRoutes);
+app.use('/api/categories', categoryRoutes);
 
 // 404 handler
 app.use((req, res) => {

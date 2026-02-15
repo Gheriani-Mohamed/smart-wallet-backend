@@ -1,8 +1,9 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║                   SMART WALLET - FINAL SCHEMA                    ║
+// ║                  ⚠️ LOCKED - DO NOT MODIFY ⚠️                    ║
+// ║         Any changes require team approval and discussion         ║
+// ║                    Last Updated: 2026-02-15                      ║
+// ╚══════════════════════════════════════════════════════════════════╝
 
 generator client {
   provider = "prisma-client-js"
@@ -13,84 +14,239 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// USER MODEL (Sirine's Module)
+// Purpose: User accounts and authentication
+// ============================================
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
-  password  String
+  password  String   // Hashed with bcrypt
   name      String
   createdAt DateTime @default(now())
   
-  walletMembers WalletMember[]
-  transactions  Transaction[]
-  budgets       Budget[]
-  alerts        Alert[]
+  // Relations
+  walletMembers      WalletMember[]
+  transactions       Transaction[]
+  budgets            Budget[]
+  alerts             Alert[]
+  savingGoals        SavingGoal[]
+  recurringTransactions RecurringTransaction[]
 }
 
+// ============================================
+// WALLET MODEL (MOATAZ's Module)
+// Purpose: Wallet/account management with sharing
+// ============================================
 model Wallet {
   id        String   @id @default(uuid())
   name      String
   type      String   // 'personal', 'family', 'company'
   balance   Float    @default(0)
+  currency  String   @default("USD") // USD, EUR, TND, etc.
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  members      WalletMember[]
-  transactions Transaction[]
-  budgets      Budget[]
+  // Relations
+  members               WalletMember[]
+  transactions          Transaction[]
+  budgets               Budget[]
+  savingGoals           SavingGoal[]
+  recurringTransactions RecurringTransaction[]
 }
 
+// ============================================
+// WALLET MEMBER MODEL (MOATAZ's Module)
+// Purpose: Many-to-many relationship for shared wallets
+// ============================================
 model WalletMember {
   id        String   @id @default(uuid())
   userId    String
   walletId  String
   joinedAt  DateTime @default(now())
   
+  // Relations
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
   
   @@unique([userId, walletId])
+  @@index([userId])
+  @@index([walletId])
 }
 
+// ============================================
+// CATEGORY MODEL (Shared by all)
+// Purpose: Transaction categories (pre-defined + custom)
+// ============================================
+model Category {
+  id         String  @id @default(uuid())
+  name       String  @unique
+  iconName   String  // Icon identifier (e.g., 'food', 'transport')
+  colorValue String  // Color as string (e.g., "4284773515") - stored as string to avoid int overflow
+  type       String  // 'income' or 'expense'
+  isCustom   Boolean @default(false) // false = system category, true = user-created
+  
+  // Relations
+  transactions Transaction[]
+  budgets      Budget[]
+}
+
+// ============================================
+// TRANSACTION MODEL (NOUR's Module)
+// Purpose: All income and expense transactions
+// ============================================
 model Transaction {
+  id                   String   @id @default(uuid())
+  userId               String
+  walletId             String
+  categoryId           String
+  amount               Float
+  type                 String   // 'income' or 'expense'
+  description          String?
+  date                 DateTime @default(now())
+  recurringTransactionId String?  // If created from recurring template
+  createdAt            DateTime @default(now())
+  
+  // Relations
+  user                 User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet               Wallet     @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  category             Category   @relation(fields: [categoryId], references: [id])
+  recurringTransaction RecurringTransaction? @relation(fields: [recurringTransactionId], references: [id])
+  
+  @@index([userId])
+  @@index([walletId])
+  @@index([categoryId])
+  @@index([date])
+  @@index([type])
+}
+
+// ============================================
+// RECURRING TRANSACTION MODEL (NOUR's Module)
+// Purpose: Templates for automatic recurring transactions
+// ============================================
+model RecurringTransaction {
   id          String   @id @default(uuid())
   userId      String
   walletId    String
-  category    String
+  categoryId  String
   amount      Float
   type        String   // 'income' or 'expense'
   description String?
-  date        DateTime @default(now())
+  frequency   String   // 'daily', 'weekly', 'monthly', 'yearly'
+  startDate   DateTime
+  endDate     DateTime? // null = no end date
+  lastGenerated DateTime // Last time a transaction was auto-created
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
   
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet       Wallet        @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  transactions Transaction[] // Generated transactions from this template
+  
+  @@index([userId])
+  @@index([walletId])
+  @@index([isActive])
 }
 
+// ============================================
+// BUDGET MODEL (Mohamed's Module)
+// Purpose: Monthly budget tracking per category
+// ============================================
 model Budget {
   id           String   @id @default(uuid())
   userId       String
   walletId     String
-  category     String
+  categoryId   String
   monthlyLimit Float
   currentSpent Float    @default(0)
-  month        String   // "2026-01"
+  month        String   // "2026-02" format
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  alerts Alert[]
+  // Relations
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet   Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id])
+  alerts   Alert[]
+  
+  @@unique([walletId, categoryId, month]) // One budget per wallet/category/month
+  @@index([userId])
+  @@index([walletId])
+  @@index([month])
 }
 
+// ============================================
+// ALERT MODEL (Mohamed's Module)
+// Purpose: Budget threshold notifications
+// ============================================
 model Alert {
   id        String   @id @default(uuid())
   userId    String
   budgetId  String
   message   String
-  alertType String   // 'warning', 'danger', 'info'
+  alertType String   // 'warning' (75%), 'danger' (90%), 'info'
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
   
+  // Relations
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   budget Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([budgetId])
+  @@index([isRead])
+  @@index([createdAt])
 }
+
+// ============================================
+// SAVING GOAL MODEL (Baligh's Module)
+// Purpose: Track progress toward savings targets
+// ============================================
+model SavingGoal {
+  id            String   @id @default(uuid())
+  userId        String
+  walletId      String
+  title         String
+  targetAmount  Float
+  currentAmount Float    @default(0)
+  startDate     DateTime @default(now())
+  endDate       DateTime
+  isCompleted   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([walletId])
+  @@index([isCompleted])
+}
+
+// ============================================
+// ANALYTICS (Baligh's Module)
+// Note: No separate table needed - analytics are calculated
+// from existing Transaction, Budget, and SavingGoal data
+// ============================================
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║                          FIELD NAMING RULES                       ║
+// ╠══════════════════════════════════════════════════════════════════╣
+// ║ ✅ ALWAYS use camelCase: userId, walletId, monthlyLimit          ║
+// ║ ❌ NEVER use snake_case: user_id, wallet_id, monthly_limit       ║
+// ║ ❌ NEVER use PascalCase: UserId, WalletId, MonthlyLimit          ║
+// ║                                                                   ║
+// ║ If you need a new field, ask team first!                         ║
+// ╚══════════════════════════════════════════════════════════════════╝
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║                         INDEX STRATEGY                            ║
+// ╠══════════════════════════════════════════════════════════════════╣
+// ║ Indexes added for frequently queried fields:                     ║
+// ║ - Foreign keys (userId, walletId, categoryId, budgetId)          ║
+// ║ - Filter fields (date, type, month, isActive, isRead)            ║
+// ║ - Unique constraints where needed                                ║
+// ╚══════════════════════════════════════════════════════════════════╝

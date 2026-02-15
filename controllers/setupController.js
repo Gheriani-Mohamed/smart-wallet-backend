@@ -36,6 +36,23 @@ exports.setupTestData = async (req, res) => {
 
     console.log('✅ Wallet created:', wallet.id);
 
+
+    const foodCategory = await prisma.category.findFirst({
+      where: { name: 'Food' }
+    });
+
+    
+    const budget = await prisma.budget.create({
+      data: {
+        userId: 'user123',
+        walletId: 'wallet123',
+        categoryId: foodCategory.id,  // CHANGED
+        monthlyLimit: 500,
+        month: '2026-02',
+      },
+        });
+
+
     // 3. Link user to wallet
     const walletMember = await prisma.walletMember.upsert({
       where: {
