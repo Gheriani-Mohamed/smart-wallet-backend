@@ -1,18 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const authMiddleware = require('../middleware/auth');
 const alertController = require('../controllers/alertController');
 
-// All routes require authentication
-router.use(authMiddleware);
-
-// Alert routes
+// Alert CRUD
+router.post('/', alertController.createAlert);
 router.get('/user/:userId', alertController.getUserAlerts);
-router.get('/unread/:userId', alertController.getUnreadAlerts);
-router.get('/count/:userId', alertController.getUnreadCount);
+router.get('/user/:userId/unread', alertController.getUnreadAlerts);
+router.get('/user/:userId/count', alertController.getUnreadCount);
+router.get('/:id', alertController.getAlertById);
 router.put('/:id/read', alertController.markAsRead);
-router.put('/read-all/:userId', alertController.markAllAsRead);
+router.put('/user/:userId/read-all', alertController.markAllAsRead);
 router.delete('/:id', alertController.deleteAlert);
-router.delete('/clear-read/:userId', alertController.clearReadAlerts);
+router.delete('/user/:userId/all', alertController.deleteAllAlerts);
 
 module.exports = router;

@@ -32,13 +32,18 @@ const setupRoutes = require('./routes/setup');
 const budgetRoutes = require('./routes/budgets');
 const alertRoutes = require('./routes/alerts');
 const categoryRoutes = require('./routes/categories');
-
+const walletRoutes = require('./routes/wallets');
+const transactionRoutes = require('./routes/transactions');
+const recurringTransactionRoutes = require('./routes/recurringTransactions');
 
 // Use routes
 app.use('/api/setup', setupRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/wallets', walletRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/recurring-transactions', recurringTransactionRoutes);
 
 // 404 handler
 app.use((req, res) => {

@@ -1,10 +1,27 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+// ==================== BUDGET CRUD ====================
+
 // Create a new budget
 exports.createBudget = async (req, res) => {
   try {
     const { userId, walletId, categoryId, monthlyLimit, month } = req.body;
+
+    // Check if budget already exists for this wallet/category/month
+    const existingBudget = await prisma.budget.findFirst({
+      where: {
+        walletId,
+        categoryId,
+        month,
+      },
+    });
+
+    if (existingBudget) {
+      return res.status(400).json({ 
+        error: 'Budget already exists for this category and month' 
+      });
+    }
 
     const budget = await prisma.budget.create({
       data: {
@@ -17,7 +34,14 @@ exports.createBudget = async (req, res) => {
         isActive: true,
       },
       include: {
-        category: true, // Include category details in response
+        category: true,
+        wallet: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
       },
     });
 
@@ -38,7 +62,17 @@ exports.getUserBudgets = async (req, res) => {
         isActive: true,
       },
       include: {
-        wallet: true,
+        category: true,
+        wallet: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
 
@@ -57,6 +91,44 @@ exports.getWalletBudgets = async (req, res) => {
       where: {
         walletId,
         isActive: true,
+      },
+      include: {
+        category: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    res.json(budgets);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Get budgets for a specific wallet and month
+exports.getWalletMonthlyBudgets = async (req, res) => {
+  try {
+    const { walletId, month } = req.params;
+
+    const budgets = await prisma.budget.findMany({
+      where: {
+        walletId,
+        month,
+        isActive: true,
+      },
+      include: {
+        category: true,
+        wallet: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
 
@@ -78,7 +150,17 @@ exports.getMonthlyBudgets = async (req, res) => {
         isActive: true,
       },
       include: {
-        wallet: true,
+        category: true,
+        wallet: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
       },
     });
 
@@ -96,8 +178,13 @@ exports.getBudgetById = async (req, res) => {
     const budget = await prisma.budget.findUnique({
       where: { id },
       include: {
+        category: true,
         wallet: true,
-        alerts: true,
+        alerts: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
       },
     });
 
@@ -115,15 +202,18 @@ exports.getBudgetById = async (req, res) => {
 exports.updateBudget = async (req, res) => {
   try {
     const { id } = req.params;
-    const { monthlyLimit, category, isActive } = req.body;
+    const { monthlyLimit, categoryId, isActive } = req.body;
 
     const budget = await prisma.budget.update({
       where: { id },
       data: {
         monthlyLimit,
-        category,
+        categoryId,
         isActive,
         updatedAt: new Date(),
+      },
+      include: {
+        category: true,
       },
     });
 
@@ -138,6 +228,7 @@ exports.deleteBudget = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Soft delete
     const budget = await prisma.budget.update({
       where: { id },
       data: {
@@ -157,7 +248,7 @@ exports.deleteBudget = async (req, res) => {
   }
 };
 
-// Update budget spent amount
+// Update budget spent amount (manual update - transactions auto-update)
 exports.updateBudgetSpent = async (req, res) => {
   try {
     const { id } = req.params;
@@ -171,10 +262,13 @@ exports.updateBudgetSpent = async (req, res) => {
         },
         updatedAt: new Date(),
       },
+      include: {
+        category: true,
+      },
     });
 
     // Check threshold after update
-    await checkBudgetThreshold(budget);
+    await checkBudgetThreshold(id, budget.currentSpent, budget.monthlyLimit, budget.userId);
 
     res.json(budget);
   } catch (error) {
@@ -214,7 +308,7 @@ exports.checkThreshold = async (req, res) => {
       return res.status(404).json({ error: 'Budget not found' });
     }
 
-    await checkBudgetThreshold(budget);
+    await checkBudgetThreshold(id, budget.currentSpent, budget.monthlyLimit, budget.userId);
 
     res.json({ message: 'Threshold check completed' });
   } catch (error) {
@@ -239,7 +333,7 @@ exports.syncWithTransactions = async (req, res) => {
     const transactions = await prisma.transaction.findMany({
       where: {
         walletId: budget.walletId,
-        category: budget.category,
+        categoryId: budget.categoryId,
         type: 'expense',
       },
     });
@@ -247,9 +341,7 @@ exports.syncWithTransactions = async (req, res) => {
     // Calculate total spent for this month
     let totalSpent = 0;
     transactions.forEach((transaction) => {
-      const transactionMonth = `${transaction.date.getFullYear()}-${String(
-        transaction.date.getMonth() + 1
-      ).padStart(2, '0')}`;
+      const transactionMonth = transaction.date.toISOString().slice(0, 7);
 
       if (transactionMonth === budget.month) {
         totalSpent += transaction.amount;
@@ -263,10 +355,13 @@ exports.syncWithTransactions = async (req, res) => {
         currentSpent: totalSpent,
         updatedAt: new Date(),
       },
+      include: {
+        category: true,
+      },
     });
 
     // Check threshold
-    await checkBudgetThreshold(updatedBudget);
+    await checkBudgetThreshold(budgetId, updatedBudget.currentSpent, updatedBudget.monthlyLimit, updatedBudget.userId);
 
     res.json(updatedBudget);
   } catch (error) {
@@ -291,7 +386,7 @@ exports.syncAllBudgets = async (req, res) => {
       const transactions = await prisma.transaction.findMany({
         where: {
           walletId: budget.walletId,
-          category: budget.category,
+          categoryId: budget.categoryId,
           type: 'expense',
         },
       });
@@ -299,9 +394,7 @@ exports.syncAllBudgets = async (req, res) => {
       // Calculate spent for this month
       let totalSpent = 0;
       transactions.forEach((transaction) => {
-        const transactionMonth = `${transaction.date.getFullYear()}-${String(
-          transaction.date.getMonth() + 1
-        ).padStart(2, '0')}`;
+        const transactionMonth = transaction.date.toISOString().slice(0, 7);
 
         if (transactionMonth === budget.month) {
           totalSpent += transaction.amount;
@@ -318,7 +411,7 @@ exports.syncAllBudgets = async (req, res) => {
       });
 
       // Check threshold
-      await checkBudgetThreshold({ ...budget, currentSpent: totalSpent });
+      await checkBudgetThreshold(budget.id, totalSpent, budget.monthlyLimit, budget.userId);
     }
 
     res.json({ message: 'All budgets synced successfully' });
@@ -327,29 +420,30 @@ exports.syncAllBudgets = async (req, res) => {
   }
 };
 
-// Helper function to check budget threshold and create alerts
-async function checkBudgetThreshold(budget) {
-  const percentageSpent = (budget.currentSpent / budget.monthlyLimit) * 100;
+// ==================== HELPER FUNCTIONS ====================
+
+async function checkBudgetThreshold(budgetId, currentSpent, monthlyLimit, userId) {
+  const percentageSpent = (currentSpent / monthlyLimit) * 100;
 
   let alertType = null;
   let message = null;
 
   if (percentageSpent >= 100) {
     alertType = 'danger';
-    message = `🚨 Budget exceeded! You've spent ${percentageSpent.toFixed(0)}% of your ${budget.category} budget.`;
+    message = `🚨 Budget exceeded! You've spent ${percentageSpent.toFixed(0)}% of your budget.`;
   } else if (percentageSpent >= 90) {
     alertType = 'danger';
-    message = `⚠️ Alert! You've spent ${percentageSpent.toFixed(0)}% of your ${budget.category} budget.`;
+    message = `⚠️ Alert! You've spent ${percentageSpent.toFixed(0)}% of your budget.`;
   } else if (percentageSpent >= 75) {
     alertType = 'warning';
-    message = `⚡ Warning! You've spent ${percentageSpent.toFixed(0)}% of your ${budget.category} budget.`;
+    message = `⚡ Warning! You've spent ${percentageSpent.toFixed(0)}% of your budget.`;
   }
 
   if (alertType && message) {
     // Check if alert already exists
     const existingAlert = await prisma.alert.findFirst({
       where: {
-        budgetId: budget.id,
+        budgetId,
         isRead: false,
         alertType,
       },
@@ -359,8 +453,8 @@ async function checkBudgetThreshold(budget) {
     if (!existingAlert) {
       await prisma.alert.create({
         data: {
-          userId: budget.userId,
-          budgetId: budget.id,
+          userId,
+          budgetId,
           message,
           alertType,
           isRead: false,
