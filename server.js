@@ -35,6 +35,7 @@ const categoryRoutes = require('./routes/categories');
 const walletRoutes = require('./routes/wallets');
 const transactionRoutes = require('./routes/transactions');
 const recurringTransactionRoutes = require('./routes/recurringTransactions');
+const savingGoalsRoutes = require('./routes/saving_goals');
 
 // Use routes
 app.use('/api/setup', setupRoutes);
@@ -44,6 +45,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/wallets', walletRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/recurring-transactions', recurringTransactionRoutes);
+app.use('/api/saving-goals', savingGoalsRoutes);
 
 // 404 handler
 app.use((req, res) => {
