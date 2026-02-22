@@ -39,7 +39,8 @@ app.use('/api/setup', setupRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/categories', categoryRoutes);
-
+app.use('/api/wallets', walletsRoutes);
+app.use('/api/walletsMember', require('./routes/walletMembersRoutes'));
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
