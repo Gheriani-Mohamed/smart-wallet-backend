@@ -16,23 +16,22 @@ exports.createSavingGoal = async (req, res) => {
     };
 
     const savingGoal = await prisma.savingGoal.create({
-  data: {
-    title,
-    targetAmount,
-    currentAmount: 0,
-    startDate: parseDate(startDate),
-    endDate: parseDate(endDate) ?? new Date(), // ensure non-null
-    isCompleted: false,
-
-    user: { connect: { id: userId } },
-    wallet: { connect: { id: walletId } },
-  },
-  include: {
-    wallet: {
-      select: { id: true, name: true, type: true },
-    },
-  },
-});
+      data: {
+        title,
+        targetAmount,
+        currentAmount: 0,
+        startDate: parseDate(startDate),
+        endDate: parseDate(endDate) ?? new Date(),
+        isCompleted: false,
+        user: { connect: { id: userId } },
+        wallet: { connect: { id: walletId } },
+      },
+      include: {
+        wallet: {
+          select: { id: true, name: true, type: true },
+        },
+      },
+    });
 
     res.status(201).json(savingGoal);
   } catch (error) {
@@ -144,32 +143,48 @@ exports.addContribution = async (req, res) => {
     const { id } = req.params;
     const { amount, description } = req.body;
 
+    // Validate amount
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Amount must be greater than 0' });
+    }
+
     const savingGoal = await prisma.savingGoal.findUnique({
       where: { id },
+      include: {
+        wallet: true, // Include wallet to check balance
+      },
     });
 
     if (!savingGoal) {
       return res.status(404).json({ error: 'Saving goal not found' });
     }
 
+    // ✅ CHECK WALLET BALANCE FIRST
+    if (savingGoal.wallet.balance < amount) {
+      return res.status(400).json({ 
+        error: 'Insufficient wallet balance',
+        currentBalance: savingGoal.wallet.balance,
+        requiredAmount: amount
+      });
+    }
+
     const newAmount = savingGoal.currentAmount + amount;
     const isCompleted = newAmount >= savingGoal.targetAmount;
 
-    // Create corresponding expense transaction
+    // Create corresponding expense transaction for the saving
     const transaction = await prisma.transaction.create({
       data: {
         userId: savingGoal.userId,
         walletId: savingGoal.walletId,
-        categoryId: "6f5e99b1-8148-4506-b5c2-a461167bf470", // e.g., "saving contributions"
+        categoryId: "4edcfd55-afab-4860-ae55-c0eea703c941", // fix this with new generatedID 
         amount,
         type: "expense",
         description: description || `Contribution to ${savingGoal.title}`,
         date: new Date(),
       },
-     
     });
 
-    //update wallet balance
+    // Update wallet balance (decrease)
     const balanceChange = -amount;
     await prisma.wallet.update({
       where: { id: savingGoal.walletId },
@@ -179,6 +194,7 @@ exports.addContribution = async (req, res) => {
         },
       },
     });
+
     // Update saving goal
     const updatedGoal = await prisma.savingGoal.update({
       where: { id },
@@ -190,7 +206,7 @@ exports.addContribution = async (req, res) => {
 
     res.json({ savingGoal: updatedGoal, transaction });
   } catch (error) {
-    console.error(error);
+    console.error('Error adding contribution:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -201,6 +217,11 @@ exports.withdrawFromGoal = async (req, res) => {
     const { id } = req.params;
     const { amount } = req.body;
 
+    // Validate amount
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Amount must be greater than 0' });
+    }
+
     const savingGoal = await prisma.savingGoal.findUnique({
       where: { id },
     });
@@ -209,27 +230,31 @@ exports.withdrawFromGoal = async (req, res) => {
       return res.status(404).json({ error: 'Saving goal not found' });
     }
 
+    // Check if goal has enough funds
     if (amount > savingGoal.currentAmount) {
-      return res.status(400).json({ error: 'Insufficient funds in goal' });
+      return res.status(400).json({ 
+        error: 'Insufficient funds in saving goal',
+        available: savingGoal.currentAmount,
+        requested: amount
+      });
     }
 
     const newAmount = savingGoal.currentAmount - amount;
 
-      // Create corresponding expense transaction
+    // Create corresponding income transaction (money back to wallet)
     const transaction = await prisma.transaction.create({
       data: {
         userId: savingGoal.userId,
         walletId: savingGoal.walletId,
-        categoryId: "c58708fc-b25c-4d68-b4f4-61d497710154", // e.g., "saving contributions"
+        categoryId: "c58708fc-b25c-4d68-b4f4-61d497710154",
         amount,
         type: "income",
         description: `Withdraw from saving: ${savingGoal.title}`,
         date: new Date(),
       },
-     
     });
     
-    //update wallet balance
+    // Update wallet balance (increase)
     const balanceChange = +amount;
     await prisma.wallet.update({
       where: { id: savingGoal.walletId },
@@ -239,6 +264,7 @@ exports.withdrawFromGoal = async (req, res) => {
         },
       },
     });
+
     // Update saving goal
     const updatedGoal = await prisma.savingGoal.update({
       where: { id },
@@ -248,8 +274,9 @@ exports.withdrawFromGoal = async (req, res) => {
       },
     });
 
-    res.json(updatedGoal);
+    res.json({ savingGoal: updatedGoal, transaction });
   } catch (error) {
+    console.error('Error withdrawing from goal:', error);
     res.status(500).json({ error: error.message });
   }
 };

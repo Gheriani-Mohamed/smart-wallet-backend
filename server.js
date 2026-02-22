@@ -29,6 +29,7 @@ app.get('/health', (req, res) => {
 
 // Import routes
 const setupRoutes = require('./routes/setup');
+const authRoutes = require('./routes/auth');
 const budgetRoutes = require('./routes/budgets');
 const alertRoutes = require('./routes/alerts');
 const categoryRoutes = require('./routes/categories');
@@ -36,9 +37,11 @@ const walletRoutes = require('./routes/wallets');
 const transactionRoutes = require('./routes/transactions');
 const recurringTransactionRoutes = require('./routes/recurringTransactions');
 const savingGoalsRoutes = require('./routes/saving_goals');
+const analyticsRoutes = require('./routes/anlytics');
 
 // Use routes
 app.use('/api/setup', setupRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -46,6 +49,7 @@ app.use('/api/wallets', walletRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/recurring-transactions', recurringTransactionRoutes);
 app.use('/api/saving-goals', savingGoalsRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // 404 handler
 app.use((req, res) => {
