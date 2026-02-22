@@ -1,25 +1,33 @@
+// middleware/auth.js
 const jwt = require('jsonwebtoken');
 
-const authMiddleware = (req, res, next) => {
+module.exports = async (req, res, next) => {
   try {
-    // Get token from header
-    const token = req.headers.authorization?.split(' ')[1]; // Bearer TOKEN
-    
-    if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
+
+    // DEV MODE
+    if (process.env.NODE_ENV === 'development') {
+      const userId =
+        req.body.userId ||
+        req.query.userId;
+
+      if (userId) {
+        req.userId = userId;
+        return next();
+      }
     }
 
-    // Verify token
+    // PROD MODE
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ message: "Non authentifié" });
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Add user info to request
-    req.userId = decoded.userId;
-    req.userEmail = decoded.email;
-    
+    req.userId = decoded.id;
     next();
+
   } catch (error) {
-    return res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ message: "Token invalide" });
   }
 };
-
-module.exports = authMiddleware;

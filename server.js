@@ -39,7 +39,7 @@ app.use('/api/setup', setupRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/categories', categoryRoutes);
-
+app.use('/api/saving-goals', require('./routes/saving_goals'));
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
