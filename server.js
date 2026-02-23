@@ -39,6 +39,20 @@ const recurringTransactionRoutes = require('./routes/recurringTransactions');
 const savingGoalsRoutes = require('./routes/saving_goals');
 const analyticsRoutes = require('./routes/anlytics');
 
+
+app.use(cors({
+  origin: [
+    'http://localhost:3000',   // Flutter web default port
+    'http://localhost:8080',   // alternative Flutter web port
+    'http://localhost:5000',   // another common port
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:8080',
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
+
 // Use routes
 app.use('/api/setup', setupRoutes);
 app.use('/api/auth', authRoutes);

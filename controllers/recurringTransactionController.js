@@ -245,7 +245,7 @@ exports.generateAllUserTransactions = async (req, res) => {
 async function generateDueTransactions(recurringTransaction) {
   const generatedTransactions = [];
   //const now = new Date(); 
-  const now = new Date(2026, 2, 3, 20, 42, 0);
+  const now = new Date(2026, 2, 4, 20, 42, 0);
   let nextDate = getNextOccurrence(recurringTransaction.lastGenerated, recurringTransaction.frequency);
 
   while (nextDate <= now) {

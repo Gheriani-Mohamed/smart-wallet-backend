@@ -25,6 +25,8 @@ model User {
   name      String
   profileImage  String?  @db.Text
   createdAt DateTime @default(now())
+  resetCode       String?
+  resetCodeExpiry DateTime?
   
   // Relations
   walletMembers      WalletMember[]

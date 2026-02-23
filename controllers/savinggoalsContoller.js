@@ -246,7 +246,7 @@ exports.withdrawFromGoal = async (req, res) => {
       data: {
         userId: savingGoal.userId,
         walletId: savingGoal.walletId,
-        categoryId: "c58708fc-b25c-4d68-b4f4-61d497710154",
+        categoryId: "0b8dafb7-e1c5-4629-a7bb-bd85c4793400",
         amount,
         type: "income",
         description: `Withdraw from saving: ${savingGoal.title}`,
